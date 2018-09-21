@@ -5,7 +5,7 @@ use App\Core\Model\Connection;
 
 class Student extends \App\Core\Model\Resource\SimpleModel
 {
-    protected $_tableName = 'student';
+    protected $_tableName = '_simple_student';
     protected $_idFieldName = 'id';
 
     public function __construct(Connection $connection)

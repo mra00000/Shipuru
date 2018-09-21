@@ -2,6 +2,8 @@
 namespace App;
 
 use App\Core\Configuration\ConfigurationManager;
+use App\Core\Model\Connection\MysqlConnection;
+use App\Core\Model\Connection\PDOMysqlConnection;
 
 class App {
     public static function create() {
@@ -10,10 +12,21 @@ class App {
 
         $dbConfig = $config['databaseConnection'];
         $connectionType = array_shift($dbConfig);
-        $dbClassName = "\\App\\Core\\Model\\Connection\\{$connectionType}Connection";
-        $dbInstance = new $dbClassName(...array_values($dbConfig));
-        ObjectManager::initObject(\App\Core\Model\Connection::class, $dbInstance);
+        $dbInstance = null;
 
-        \App\Routers::route();
+        switch ($connectionType) {
+            case 'Mysql':
+                $dbInstance = new MysqlConnection(...array_values($dbConfig));
+                break;
+            case 'PDO':
+                $dbInstance = new PDOMysqlConnection(
+                    "mysql:host={$dbConfig['host']}:{$dbConfig['port']};dbName={$dbConfig['dbName']}",
+                    $dbConfig['user'], $dbConfig['pass']
+                );
+                break;
+        }
+        ObjectManager::initObject(Core\Model\Connection::class, $dbInstance);
+
+        Routers::route();
     }
 }

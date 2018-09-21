@@ -1,11 +1,34 @@
 <?php
 
 namespace App\Core\Model\Connection;
+
 use App\Core\Configuration\ConfigurationManager;
 use App\Core\Model\Connection;
 
 class MysqlConnection extends \mysqli implements Connection
 {
+    protected $comparisons = [
+        'equal' => '=',
+        'not_equal' => '<>',
+        'not_equal_other' => '!=',
+        'less' => '<',
+        'less_or_equal' => '<=',
+        'greater' => '>',
+        'greater_or_equal' => '>=',
+        'like' => 'like',
+        'in' => 'in',
+        'not_in' => 'not in',
+        'between' => 'between',
+        'not_between' => 'not between',
+    ];
+
+    private $_queryData = [
+        'select' => false,
+        'from' => false,
+        'where' => false,
+        'offset' => false
+    ];
+
     public function __construct($host, $username, $passwd, $dbname, $port)
     {
         parent::__construct($host, $username, $passwd, $dbname, $port);
@@ -19,9 +42,7 @@ class MysqlConnection extends \mysqli implements Connection
 
     public function preparedQuery($query, array $params)
     {
-        $type = '';
-        foreach($params as $param)
-            $type .= gettype($params)[0];
+        $type = $this->initTypes($params);
         $statement = $this->prepare($query);
         $statement->bind_param($type, ...$params);
         $statement->execute();
@@ -36,7 +57,15 @@ class MysqlConnection extends \mysqli implements Connection
         return ($result) ? $this->formatResult($result) : $result;
     }
 
-    private function formatResult(\mysqli_result $result) {
+    private function initTypes(array $params)
+    {
+        $count = count($params);
+        $sample = 's';
+        return str_repeat($sample, $count);
+    }
+
+    private function formatResult(\mysqli_result $result)
+    {
         $data = [];
         while ($row = $result->fetch_assoc()) {
             array_push($data, $row);
@@ -44,68 +73,55 @@ class MysqlConnection extends \mysqli implements Connection
         return $data;
     }
 
-    public function getByFieldName($tableName, $fieldName, $searchValue, array $selectedFields = [])
+    public function select($fields = '*')
     {
-        $type = gettype($searchValue)[0];
-        $fields = (count($selectedFields) == 0) ? '*' : implode(', ', $selectedFields);
-        $statement = $this->prepare("select $fields from $tableName where $fieldName = ?");
-        $statement->bind_param($type, $searchValue);
-        $statement->execute();
-        $result = $statement->get_result();
-        return ($result) ? $this->formatResult($result) : $result;
+        $this->_queryData['select'] = $fields;
+        return $this;
     }
 
-    public function saveNewRecord($tableName, array $data)
+    public function from($from)
     {
-        $cols = implode(', ', array_keys($data));
-        $values = array_values($data);
-        $queryPlaceholder = [];
-        $types = '';
-        foreach ($values as $value) {
-            array_push($queryPlaceholder, '?');
-            $types .= gettype($value)[0];
-        }
-        $queryPlaceholder = implode(', ', $queryPlaceholder);
-        $statement = $this->prepare("insert into $tableName ({$cols}) values ({$queryPlaceholder})");
-        $statement->bind_param($types, ...$values);
-        $statement->execute();
-        return $this->insert_id;
+        $this->_queryData['from'] = $from;
+        return $this;
     }
 
-    public function updateRecord($tableName, array $data, array $filter)
+    public function where(array $where)
     {
-        $filterTypes = '';
-        $filterKeys = [];
-        $dataTypes = '';
-        $dataKeys = [];
-        foreach ($filter as $key => $value) {
-            $filterTypes .= gettype($value)[0];
-            array_push($filterKeys, "{$key}=?");
-        }
-        foreach ($data as $key => $value) {
-            $dataTypes .= gettype($value)[0];
-            array_push($dataKeys, "{$key}=?");
-        }
-        $filterKeys = implode(' and ', $filterKeys);
-        $dataKeys = implode(', ', $dataKeys);
-        $query = "update {$tableName} set $dataKeys where $filterKeys";
-        $bindParams = array_merge(array_values($data), array_values($filter));
-        $statement = $this->prepare($query);
-        echo $this->error;
-
-        $statement->bind_param($dataTypes . $filterTypes, ...$bindParams);
-        $statement->execute();
+        if (!is_array($where[0])) $where = [$where];
+        $this->_queryData['where'] = $where;
+        return $this;
     }
 
-    public function join($sourceTableName, $targetTableName, array $conditions, $mode = 'inner')
+    public function execute()
     {
-        $conditionValues = [];
-        foreach ($conditions as $key => $value) {
-            array_push($conditionValues, "{$sourceTableName}.{$key} = {$targetTableName}.{$value}");
+        $params = [];
+
+        $select = $this->_queryData['select'];
+        if (is_array($select)) $select = implode(',', $select);
+        $select = 'select ' . $select;
+
+        $from = 'from ';
+        if (is_string($this->_queryData['from']))
+            $from .= $this->_queryData['from'];
+
+        $where = '';
+        if ($this->_queryData['where']) {
+            $where = 'where';
+            $next = '';
+            foreach ($this->_queryData['where'] as $cond) {
+                $next = (isset($cond[3])) ? $cond[3] : 'and';
+                $where .= " {$cond[0]} {$this->comparisons[$cond[2]]} ? {$next}";
+                array_push($params, $cond[1]);
+            }
+            $where = substr($where, 0, -strlen($next));
         }
-        $conditionValues = implode(' and ', $conditionValues);
-        $query = "select {$sourceTableName}.*, {$targetTableName}.* from {$sourceTableName} {$mode} join {$targetTableName} on $conditionValues limit 10";
-        $result = $this->query($query);
-        return ($result) ? $this->formatResult($result) : $result;
+
+        $query = $select . ' ' . $from . ' ' . $where;
+        echo '<pre>';
+        echo $query . '<br>';
+        print_r($params);
+        echo '</pre>';
+        die();
+        return $this->preparedQuery($query, $params);
     }
 }

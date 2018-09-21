@@ -83,20 +83,20 @@ class SimpleModel
         $this->_data = $data;
     }
 
-    public function getById($id) {
-        return $this->_resourceModel->getById($id);
-    }
-
-    public function save() {
-        return $this->_resourceModel->save($this);
-    }
-
-    public function newRecord() {
-        $className = get_class($this);
-        return new $className($this->_resourceModel);
-    }
-
-    public function join($tabkeName, array $conditions) {
-        return $this->_resourceModel->join($tabkeName, $conditions);
-    }
+//    public function getById($id) {
+//        return $this->_resourceModel->getById($id);
+//    }
+//
+//    public function save() {
+//        return $this->_resourceModel->save($this);
+//    }
+//
+//    public function newRecord() {
+//        $className = get_class($this);
+//        return new $className($this->_resourceModel);
+//    }
+//
+//    public function join($tabkeName, array $conditions) {
+//        return $this->_resourceModel->join($tabkeName, $conditions);
+//    }
 }

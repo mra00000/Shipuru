@@ -5,7 +5,7 @@ return [
         'host' => 'localhost',
         'user' => 'root',
         'pass' => '',
-        'dbName' => 'employees',
+        'dbName' => 'Shipuru',
         'port' => 3306
     ]
 ];
